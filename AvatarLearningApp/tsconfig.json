@@ -1,0 +1,7 @@
+{
+  "extends": "@react-native/typescript-config/tsconfig.json",
+  "compilerOptions": {
+    "lib": ["ES2020", "DOM", "DOM.Iterable", "ES2020.BigInt"],
+    "forceConsistentCasingInFileNames": true
+  }
+}

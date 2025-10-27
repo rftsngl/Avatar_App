@@ -1,0 +1,51 @@
+# Dependencies
+**/node_modules/
+
+# Build outputs
+**/build/
+**/dist/
+*.jsbundle
+
+# iOS
+**/ios/Pods/
+**/ios/.xcode.env.local
+*.pbxuser
+!default.pbxuser
+*.xcworkspace
+!default.xcworkspace
+**/xcuserdata/
+**/DerivedData/
+*.ipa
+
+# Android
+**/.gradle/
+**/.idea/
+**/local.properties
+*.hprof
+*.apk
+*.aab
+# Release keystore (CRITICAL - keep debug.keystore for dev)
+**/android/app/*.keystore
+!**/android/app/debug.keystore
+
+# Logs
+*.log
+
+# Cache
+.metro-health-check*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+
+# AI Assistant
+.amazonq/
+.github/
+
+# Environment
+.env
+.env.local
+
