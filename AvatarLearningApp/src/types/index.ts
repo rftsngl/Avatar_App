@@ -176,6 +176,7 @@ export interface VideoMetadata {
   resolution?: [number, number];
   createdAt: string;
   status: VideoStatus;
+  cloudVideoUrl?: string; // For cloud-stored videos (HeyGen)
 }
 
 /**

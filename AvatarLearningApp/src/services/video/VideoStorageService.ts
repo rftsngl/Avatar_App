@@ -153,7 +153,15 @@ export class VideoStorageService {
    */
   static async getAllVideos(): Promise<VideoMetadata[]> {
     try {
+      Logger.info('VideoStorageService: Getting all videos from storage');
       const videos = await AsyncStorageService.getItem<VideoMetadata[]>(StorageKeys.VIDEO_METADATA);
+      
+      Logger.info('VideoStorageService: Retrieved videos', {
+        found: !!videos,
+        count: videos?.length || 0,
+        data: videos,
+      });
+      
       return videos || [];
     } catch (error) {
       Logger.error('VideoStorageService: Failed to get videos', error);

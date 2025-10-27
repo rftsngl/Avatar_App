@@ -180,10 +180,13 @@ const PhotoAvatarCreationScreen: React.FC<Props> = ({ navigation, route }) => {
         returnScreen: 'PhotoAvatarCreation',
       });
 
-      // Navigate to voice catalog
+      // Navigate to voice catalog using proper navigation hierarchy
+      // First navigate to MainTabs, then to VoiceCatalog tab
       navigation.navigate('MainTabs', { 
         screen: 'VoiceCatalog',
       });
+      
+      Logger.info('PhotoAvatarCreationScreen: Navigated to voice catalog');
     } catch (error) {
       Logger.error('PhotoAvatarCreationScreen: Failed to navigate to voice catalog', error);
       Alert.alert('Error', 'Failed to open voice catalog');
@@ -309,12 +312,20 @@ const PhotoAvatarCreationScreen: React.FC<Props> = ({ navigation, route }) => {
    */
   React.useEffect(() => {
     const unsubscribe = navigation.addListener('focus', async () => {
-      const tempVoice = await AsyncStorageService.getItem<Voice>('temp_selected_voice');
-      if (tempVoice) {
-        setSelectedVoice(tempVoice);
-        setCurrentStep('preview');
-        await AsyncStorageService.removeItem('temp_selected_voice');
-        Logger.info('PhotoAvatarCreationScreen: Voice selected', { voiceId: tempVoice.id });
+      try {
+        const tempVoice = await AsyncStorageService.getItem<Voice>('temp_selected_voice');
+        if (tempVoice) {
+          setSelectedVoice(tempVoice);
+          setCurrentStep('preview');
+          await AsyncStorageService.removeItem('temp_selected_voice');
+          HapticUtils.success();
+          Logger.info('PhotoAvatarCreationScreen: Voice selected from catalog', { 
+            voiceId: tempVoice.id,
+            voiceName: tempVoice.name,
+          });
+        }
+      } catch (error) {
+        Logger.error('PhotoAvatarCreationScreen: Error checking temp voice', error);
       }
     });
 

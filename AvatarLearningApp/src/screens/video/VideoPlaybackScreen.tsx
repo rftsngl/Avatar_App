@@ -124,23 +124,32 @@ const VideoPlaybackScreen: React.FC<Props> = ({ navigation, route }) => {
         throw new Error('Video not found');
       }
 
-      // Check if video file exists
-      const fileExists = await VideoStorageService.videoFileExists(videoId);
-
-      if (!fileExists) {
-        throw new Error('Video file not found on device');
-      }
-
-      // Get video file path
-      const filePath = VideoStorageService.getVideoFilePath(videoId);
-
       setMetadata(videoMetadata);
-      setVideoPath(filePath);
 
-      Logger.info('VideoPlaybackScreen: Video loaded', {
-        videoId,
-        filePath,
-      });
+      // Check if this is a cloud video (HeyGen)
+      if (videoMetadata.cloudVideoUrl) {
+        Logger.info('VideoPlaybackScreen: Using cloud video URL', {
+          videoId,
+          url: videoMetadata.cloudVideoUrl,
+        });
+        setVideoPath(videoMetadata.cloudVideoUrl);
+      } else {
+        // Local video file
+        const fileExists = await VideoStorageService.videoFileExists(videoId);
+
+        if (!fileExists) {
+          throw new Error('Video file not found on device');
+        }
+
+        // Get video file path
+        const filePath = VideoStorageService.getVideoFilePath(videoId);
+        setVideoPath(filePath);
+
+        Logger.info('VideoPlaybackScreen: Video loaded from local storage', {
+          videoId,
+          filePath,
+        });
+      }
     } catch (err) {
       Logger.error('VideoPlaybackScreen: Failed to load video', err);
       const errorMessage = ErrorHandler.getUserMessage(err);

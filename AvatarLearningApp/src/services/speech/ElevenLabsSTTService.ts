@@ -5,12 +5,13 @@
  * ElevenLabs STT Integration (2025-10-27)
  * ============================================================================
  * Replaces native @react-native-voice/voice with ElevenLabs API for better
- * accuracy and consistency across platforms. Uses model: eleven_multilingual_v2
+ * accuracy and consistency across platforms. Uses model: scribe_v1 (stable)
  * Supports all 13 languages from the original native STT implementation.
  * ============================================================================
  * 
  * API Endpoint: https://api.elevenlabs.io/v1/speech-to-text
- * Model: eleven_multilingual_v2
+ * Model: scribe_v1 (stable production model)
+ * Alternative: scribe_v1_experimental (beta features)
  * 
  * Features:
  * - Audio recording via react-native-audio-recorder-player
@@ -58,7 +59,7 @@ if (__DEV__) {
  */
 const ELEVENLABS_API_BASE_URL = 'https://api.elevenlabs.io/v1';
 const STT_ENDPOINT = `${ELEVENLABS_API_BASE_URL}/speech-to-text`;
-const STT_MODEL = 'eleven_multilingual_v2';
+const STT_MODEL = 'scribe_v1'; // Stable production model for STT
 const REQUEST_TIMEOUT = 30000; // 30 seconds
 
 /**
@@ -116,6 +117,7 @@ export interface ElevenLabsSTTResult {
  */
 export interface ElevenLabsSTTCallbacks {
   onStart?: () => void;
+  onProcessing?: () => void; // Called when starting to process audio with API
   onResult?: (result: ElevenLabsSTTResult) => void;
   onEnd?: () => void;
   onError?: (error: Error) => void;
@@ -280,6 +282,7 @@ export class ElevenLabsSTTService {
       Logger.info('ElevenLabsSTTService: Recording stopped', { path: result });
 
       this.currentState = 'processing';
+      this.callbacks.onProcessing?.(); // Notify UI that processing started
 
       // Check if recording file exists
       if (!this.recordingPath || !(await RNFS.exists(this.recordingPath))) {
@@ -358,6 +361,7 @@ export class ElevenLabsSTTService {
     try {
       Logger.info('ElevenLabsSTTService: Processing audio with ElevenLabs API', {
         language: this.currentLanguage,
+        audioFilePath,
       });
 
       // Get API key
@@ -366,23 +370,50 @@ export class ElevenLabsSTTService {
       // Get language code for ElevenLabs (ISO 639-1)
       const languageCode = LANGUAGE_CODE_MAP[this.currentLanguage] || 'en';
 
-      // Read audio file as base64
-      const audioBase64 = await RNFS.readFile(audioFilePath, 'base64');
+      // Check if file exists
+      const fileExists = await RNFS.exists(audioFilePath);
+      if (!fileExists) {
+        Logger.error('ElevenLabsSTTService: Audio file does not exist', { audioFilePath });
+        throw ErrorHandler.createError(
+          ErrorCode.STORAGE_ERROR,
+          'Audio file not found'
+        );
+      }
 
-      // Convert base64 to blob for FormData
-      // Note: In React Native, FormData handles file URIs directly
+      // Get file stats for logging
+      const fileStat = await RNFS.stat(audioFilePath);
+      Logger.info('ElevenLabsSTTService: Audio file stats', {
+        size: fileStat.size,
+        path: audioFilePath,
+      });
+
+      // Create FormData with proper file URI format
+      // React Native FormData requires platform-specific URI handling
       const formData = new FormData();
-      formData.append('audio', {
-        uri: `file://${audioFilePath}`,
+      
+      // Ensure file:// prefix is present
+      const fileUri = audioFilePath.startsWith('file://') 
+        ? audioFilePath 
+        : `file://${audioFilePath}`;
+
+      // ElevenLabs API requires 'file' field name (not 'audio')
+      formData.append('file', {
+        uri: fileUri,
         type: 'audio/m4a',
         name: 'recording.m4a',
       } as any);
-      formData.append('model', STT_MODEL);
+      
+      // Add model_id parameter
+      formData.append('model_id', STT_MODEL);
+      
+      // Add language parameter (optional but recommended)
       formData.append('language', languageCode);
-
+      
       Logger.info('ElevenLabsSTTService: Sending request to ElevenLabs', {
         model: STT_MODEL,
         language: languageCode,
+        fileUri,
+        endpoint: STT_ENDPOINT,
       });
 
       // Send request to ElevenLabs API
@@ -398,7 +429,14 @@ export class ElevenLabsSTTService {
         }
       );
 
+      Logger.info('ElevenLabsSTTService: Response received', {
+        status: response.status,
+        hasData: !!response.data,
+        hasText: !!response.data?.text,
+      });
+
       if (!response.data || !response.data.text) {
+        Logger.error('ElevenLabsSTTService: Invalid API response', { response: response.data });
         throw ErrorHandler.createError(
           ErrorCode.API_SERVER_ERROR,
           'Invalid response from ElevenLabs API'
@@ -425,7 +463,17 @@ export class ElevenLabsSTTService {
         if (axiosError.response) {
           Logger.error('ElevenLabsSTTService: API error response', {
             status: axiosError.response.status,
+            statusText: axiosError.response.statusText,
             data: axiosError.response.data,
+            headers: axiosError.response.headers,
+          });
+        } else if (axiosError.request) {
+          Logger.error('ElevenLabsSTTService: No response received', {
+            request: axiosError.request,
+          });
+        } else {
+          Logger.error('ElevenLabsSTTService: Request setup error', {
+            message: axiosError.message,
           });
         }
         throw ErrorHandler.handleAPIError(axiosError);

@@ -87,19 +87,25 @@ const VideoArchiveScreen: React.FC<Props> = ({ navigation, route }) => {
       // Get all videos
       const allVideos = await VideoStorageService.getAllVideos();
 
+      Logger.info('VideoArchiveScreen: Raw videos data', {
+        count: allVideos.length,
+        videos: allVideos,
+      });
+
       // Get total storage used
       const storage = await VideoStorageService.getTotalStorageUsed();
 
       setVideos(allVideos);
       setTotalStorage(storage);
 
-      Logger.info('VideoArchiveScreen: Videos loaded', {
+      Logger.info('VideoArchiveScreen: Videos loaded successfully', {
         count: allVideos.length,
         storage,
       });
     } catch (error) {
       Logger.error('VideoArchiveScreen: Failed to load videos', error);
-      Alert.alert('Error', 'Failed to load videos');
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      Alert.alert('Error', `Failed to load videos: ${errorMessage}`);
     } finally {
       setIsLoading(false);
     }
@@ -277,8 +283,24 @@ const VideoArchiveScreen: React.FC<Props> = ({ navigation, route }) => {
     try {
       Logger.info('VideoArchiveScreen: Sharing video', { videoId, platform });
 
-      if (platform === 'heygen') {
-        // Get shareable URL from HeyGen
+      // Get video metadata to check for cloud URL
+      const videoMetadata = await VideoStorageService.getVideoById(videoId);
+      
+      if (!videoMetadata) {
+        Alert.alert('Error', 'Video not found');
+        return;
+      }
+
+      // Check if this is a cloud video with URL
+      if (videoMetadata.cloudVideoUrl) {
+        await Share.share({
+          message: `Check out this AI-generated video: ${videoMetadata.cloudVideoUrl}`,
+          url: videoMetadata.cloudVideoUrl,
+          title: 'Share AI Video',
+        });
+        Logger.info('VideoArchiveScreen: Cloud video shared successfully');
+      } else if (platform === 'heygen') {
+        // Try to get shareable URL from HeyGen API
         Alert.alert('Generating Link', 'Getting shareable link...');
         
         const shareableUrl = await HeyGenService.getShareableUrl(videoId);
@@ -289,12 +311,12 @@ const VideoArchiveScreen: React.FC<Props> = ({ navigation, route }) => {
           title: 'Share AI Video',
         });
 
-        Logger.info('VideoArchiveScreen: Video shared successfully');
+        Logger.info('VideoArchiveScreen: HeyGen video shared successfully');
       } else {
         // D-ID videos - local file only
         Alert.alert(
           'Share Not Available',
-          'Sharing is currently only supported for HeyGen videos. D-ID videos are stored locally on your device.'
+          'This video is stored locally on your device. Only cloud videos can be shared via link.'
         );
       }
     } catch (error) {
@@ -311,9 +333,10 @@ const VideoArchiveScreen: React.FC<Props> = ({ navigation, route }) => {
 
     try {
       Logger.info('VideoArchiveScreen: Syncing from HeyGen API');
-      Alert.alert('Syncing', 'Fetching videos from HeyGen...');
+      
+      setIsLoading(true);
 
-      const result = await HeyGenService.listVideos(50); // Get last 50 videos
+      const result = await HeyGenService.listVideos(100); // Get last 100 videos
       
       Logger.info('VideoArchiveScreen: Fetched videos from HeyGen', {
         count: result.videos.length,
@@ -325,18 +348,81 @@ const VideoArchiveScreen: React.FC<Props> = ({ navigation, route }) => {
       );
 
       if (completedVideos.length === 0) {
-        Alert.alert('No New Videos', 'No completed videos found on HeyGen.');
+        setIsLoading(false);
+        Alert.alert('No Videos Found', 'No completed videos found on HeyGen account.');
         return;
       }
 
+      // Get existing videos to avoid duplicates
+      const existingVideos = await VideoStorageService.getAllVideos();
+      const existingIds = new Set(existingVideos.map(v => v.id));
+
+      let importedCount = 0;
+      let skippedCount = 0;
+
+      // Import each completed video
+      for (const video of completedVideos) {
+        // Skip if already imported
+        if (existingIds.has(video.video_id)) {
+          skippedCount++;
+          continue;
+        }
+
+        try {
+          // Get video details to extract metadata
+          const videoStatus = await HeyGenService.getVideoStatus(video.video_id);
+          
+          // Create metadata (video stays in HeyGen cloud, we just save reference)
+          const metadata: VideoMetadata = {
+            id: video.video_id,
+            platform: 'heygen',
+            avatarId: 'heygen_cloud', // Cloud video, no local avatar
+            avatarName: 'HeyGen Avatar',
+            voiceId: 'heygen_cloud',
+            voiceName: 'HeyGen Voice',
+            text: 'Cloud Video', // HeyGen doesn't provide script text in list
+            createdAt: new Date(video.created_at * 1000).toISOString(), // Unix timestamp to ISO
+            status: 'completed',
+            cloudVideoUrl: videoStatus.resultUrl, // Store cloud URL
+          };
+
+          await VideoStorageService.saveVideoMetadata(metadata);
+          importedCount++;
+
+          Logger.info('VideoArchiveScreen: Imported HeyGen video', {
+            videoId: video.video_id,
+          });
+        } catch (error) {
+          Logger.warn('VideoArchiveScreen: Failed to import video', {
+            videoId: video.video_id,
+            error,
+          });
+          // Continue with next video
+        }
+      }
+
+      setIsLoading(false);
+
+      // Reload videos to show imported ones
+      await loadVideos();
+
       HapticUtils.success();
-      Alert.alert(
-        'Sync Complete',
-        `Found ${completedVideos.length} completed video(s) on HeyGen.\n\nNote: Videos are stored in HeyGen's cloud. Use the Share button to get links to your videos.`,
-        [{ text: 'OK' }]
-      );
+      
+      if (importedCount === 0) {
+        Alert.alert(
+          'No New Videos',
+          `All ${completedVideos.length} video(s) already imported.`
+        );
+      } else {
+        Alert.alert(
+          'Sync Complete',
+          `✅ Imported: ${importedCount} new video(s)\n${skippedCount > 0 ? `⏭️ Skipped: ${skippedCount} (already imported)` : ''}\n\n💡 Videos remain in HeyGen cloud. Use Share button to get video links.`,
+          [{ text: 'OK' }]
+        );
+      }
     } catch (error) {
       Logger.error('VideoArchiveScreen: Failed to sync from HeyGen', error);
+      setIsLoading(false);
       HapticUtils.error();
       Alert.alert('Sync Failed', ErrorHandler.getUserMessage(error));
     }
@@ -541,9 +627,9 @@ const VideoArchiveScreen: React.FC<Props> = ({ navigation, route }) => {
             {formatStorage(totalStorage)} used
           </Text>
           <View style={styles.storageActions}>
-            {filterOption === 'heygen' && (
+            {(filterOption === 'all' || filterOption === 'heygen') && (
               <TouchableOpacity onPress={handleSyncFromHeyGen}>
-                <Text style={styles.syncText}>↻ Sync</Text>
+                <Text style={styles.syncText}>☁️ Sync</Text>
               </TouchableOpacity>
             )}
             {videos.length > 0 && (

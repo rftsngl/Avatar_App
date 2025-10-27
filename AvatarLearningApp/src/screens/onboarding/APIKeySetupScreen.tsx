@@ -22,6 +22,7 @@ import { StackNavigationProp } from '@react-navigation/stack';
 import { RouteProp } from '@react-navigation/native';
 import { RootStackParamList, PlatformType } from '../../types';
 import { PlatformService } from '../../services/platform';
+import { SecureStorageService } from '../../services/storage';
 import { Logger } from '../../utils/Logger';
 import { ErrorHandler } from '../../utils/ErrorHandler';
 
@@ -65,7 +66,7 @@ const PLATFORM_INFO = {
   elevenlabs: {
     name: 'ElevenLabs',
     color: '#10B981',
-    apiKeyFormat: 'API key string (xi-api-key)',
+    apiKeyFormat: 'API key string (starts with "xi_")',
     helpUrl: 'https://elevenlabs.io/docs/api-reference/authentication',
     instructions: [
       'Sign up at elevenlabs.io',
@@ -154,33 +155,58 @@ const APIKeySetupScreen: React.FC<Props> = ({ navigation, route }) => {
 
     try {
       // Save API key securely
-      const saveSuccess = await PlatformService.saveAPIKey(platform, apiKey.trim());
+      let saveSuccess: boolean;
+      
+      if (platform === 'elevenlabs') {
+        // Special handling for ElevenLabs (not a platform, just STT service)
+        await SecureStorageService.saveAPIKey('elevenlabs', apiKey.trim());
+        saveSuccess = true;
+        
+        Logger.info('ElevenLabs API key saved successfully');
 
-      if (!saveSuccess) {
-        Alert.alert('Error', 'Failed to save API key. Please try again.');
-        setIsSaving(false);
-        return;
-      }
-
-      Logger.info('API key saved successfully');
-
-      // Navigate to Main Tabs screen
-      Alert.alert(
-        'Setup Complete!',
-        `Your ${platformInfo.name} API key has been saved securely. You can now start creating videos!`,
-        [
-          {
-            text: 'Get Started',
-            onPress: () => {
-              // Reset navigation stack to MainTabs
-              navigation.reset({
-                index: 0,
-                routes: [{ name: 'MainTabs' }],
-              });
+        // Navigate back to settings (ElevenLabs is configured from Settings)
+        Alert.alert(
+          'Success!',
+          'Your ElevenLabs API key has been saved securely. Speech-to-text is now enabled!',
+          [
+            {
+              text: 'OK',
+              onPress: () => {
+                navigation.goBack();
+              },
             },
-          },
-        ]
-      );
+          ]
+        );
+      } else {
+        // Standard platform (HeyGen or D-ID)
+        saveSuccess = await PlatformService.saveAPIKey(platform, apiKey.trim());
+
+        if (!saveSuccess) {
+          Alert.alert('Error', 'Failed to save API key. Please try again.');
+          setIsSaving(false);
+          return;
+        }
+
+        Logger.info('API key saved successfully');
+
+        // Navigate to Main Tabs screen
+        Alert.alert(
+          'Setup Complete!',
+          `Your ${platformInfo.name} API key has been saved securely. You can now start creating videos!`,
+          [
+            {
+              text: 'Get Started',
+              onPress: () => {
+                // Reset navigation stack to MainTabs
+                navigation.reset({
+                  index: 0,
+                  routes: [{ name: 'MainTabs' }],
+                });
+              },
+            },
+          ]
+        );
+      }
     } catch (error) {
       Logger.error('Error saving API key', error);
       Alert.alert('Error', 'An unexpected error occurred. Please try again.');

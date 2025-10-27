@@ -196,8 +196,20 @@ const VoiceCatalogScreen: React.FC<Props> = ({ navigation, route }) => {
       await AsyncStorageService.removeItem('selection_mode');
       // Navigate back to the return screen
       HapticUtils.success();
-      Logger.info('VoiceCatalogScreen: Voice selected for video creation', { voiceId: voice.id });
-      navigation.navigate(selectionMode.returnScreen as any);
+      Logger.info('VoiceCatalogScreen: Voice selected for video creation', { 
+        voiceId: voice.id,
+        returnScreen: selectionMode.returnScreen,
+      });
+      
+      // Navigate based on return screen
+      if (selectionMode.returnScreen === 'PhotoAvatarCreation') {
+        navigation.navigate('PhotoAvatarCreation');
+      } else if (selectionMode.returnScreen === 'VideoCreation') {
+        navigation.navigate('MainTabs', { screen: 'VideoCreation' });
+      } else {
+        // Fallback: go back
+        navigation.goBack();
+      }
     }
   }, [navigation]);
 
@@ -249,8 +261,20 @@ const VoiceCatalogScreen: React.FC<Props> = ({ navigation, route }) => {
       await AsyncStorageService.removeItem('selection_mode');
       // Navigate back to the return screen
       HapticUtils.success();
-      Logger.info('VoiceCatalogScreen: Brand voice selected', { voiceId: voice.voice_id });
-      navigation.navigate(selectionMode.returnScreen as any);
+      Logger.info('VoiceCatalogScreen: Brand voice selected', { 
+        voiceId: voice.voice_id,
+        returnScreen: selectionMode.returnScreen,
+      });
+      
+      // Navigate based on return screen
+      if (selectionMode.returnScreen === 'PhotoAvatarCreation') {
+        navigation.navigate('PhotoAvatarCreation');
+      } else if (selectionMode.returnScreen === 'VideoCreation') {
+        navigation.navigate('MainTabs', { screen: 'VideoCreation' });
+      } else {
+        // Fallback: go back
+        navigation.goBack();
+      }
     }
   }, [navigation]);
 

@@ -45,7 +45,6 @@ import { ErrorHandler } from '../../utils/ErrorHandler';
 import { HapticUtils } from '../../utils/hapticUtils';
 import { PermissionUtils } from '../../utils/permissionUtils';
 import { AsyncStorageService } from '../../services/storage';
-import { VoiceInputButton } from '../../components';
 
 type VideoCreationScreenNavigationProp = BottomTabNavigationProp<
   MainTabParamList,
@@ -165,6 +164,11 @@ const VideoCreationScreen: React.FC<Props> = ({ navigation, route }) => {
             HapticUtils.success();
             startRecordingTimer();
           },
+          onProcessing: () => {
+            Logger.info('VideoCreationScreen: Processing audio with ElevenLabs API');
+            setSpeechRecognitionState('processing');
+            stopRecordingTimer();
+          },
           onResult: (result) => {
             Logger.info('VideoCreationScreen: Transcription result', { text: result.text });
             // Append transcribed text to script
@@ -174,7 +178,6 @@ const VideoCreationScreen: React.FC<Props> = ({ navigation, route }) => {
             });
             setSpeechRecognitionState('idle');
             HapticUtils.success();
-            stopRecordingTimer();
           },
           onEnd: () => {
             Logger.info('VideoCreationScreen: Recording ended');
@@ -253,8 +256,9 @@ const VideoCreationScreen: React.FC<Props> = ({ navigation, route }) => {
       if (speechRecognitionState === 'recording') {
         // Stop recording
         HapticUtils.light();
+        // Don't set state here - let the service callbacks handle it
         await ElevenLabsSTTService.stopListening();
-        setSpeechRecognitionState('processing');
+        // State will be updated by onResult or onEnd callback
       } else if (speechRecognitionState === 'idle') {
         // Check microphone permission
         const hasPermission = await PermissionUtils.ensureMicrophonePermission();
@@ -277,8 +281,9 @@ const VideoCreationScreen: React.FC<Props> = ({ navigation, route }) => {
 
         // Start recording
         HapticUtils.light();
-        setSpeechRecognitionState('recording');
+        // Don't set state here - let the service callbacks handle it
         await ElevenLabsSTTService.startListening(selectedLanguage);
+        // State will be updated by onStart callback
       }
     } catch (error) {
       Logger.error('VideoCreationScreen: Voice input error', error);
@@ -469,10 +474,61 @@ const VideoCreationScreen: React.FC<Props> = ({ navigation, route }) => {
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
       >
-        {/* Script Input */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Script</Text>
+        {/* Header Title */}
+        <Text style={styles.headerTitle}>AI Avatar</Text>
+
+        {/* Avatar Display - Large Circular */}
+        <TouchableOpacity
+          style={styles.avatarContainer}
+          onPress={handleSelectAvatar}
+          disabled={isGenerating}
+          activeOpacity={0.8}
+        >
+          {selectedAvatar ? (
+            <>
+              {selectedAvatar.thumbnailUrl ? (
+                <Image
+                  source={{ uri: selectedAvatar.thumbnailUrl }}
+                  style={styles.avatarImageLarge}
+                  resizeMode="cover"
+                />
+              ) : (
+                <View style={[styles.avatarImageLarge, styles.avatarPlaceholder]}>
+                  <Text style={styles.placeholderIconLarge}>👤</Text>
+                </View>
+              )}
+              <View style={styles.changeAvatarBadge}>
+                <Text style={styles.changeAvatarText}>✏️</Text>
+              </View>
+            </>
+          ) : (
+            <View style={[styles.avatarImageLarge, styles.avatarPlaceholderEmpty]}>
+              <Text style={styles.placeholderIconLarge}>👤</Text>
+              <Text style={styles.selectAvatarPrompt}>Avatar Seç</Text>
+            </View>
+          )}
+        </TouchableOpacity>
+
+        {/* Avatar Name (if selected) */}
+        {selectedAvatar && (
+          <Text style={styles.avatarName}>{selectedAvatar.name}</Text>
+        )}
+
+        {/* Script Input Section */}
+        <View style={styles.inputSection}>
+          {/* Top Section: Voice & Language Selection */}
+          <View style={styles.inputHeader}>
+            <TouchableOpacity
+              style={styles.voiceSelectButton}
+              onPress={handleSelectVoice}
+              disabled={isGenerating}
+            >
+              <Text style={styles.voiceSelectIcon}>🎤</Text>
+              <Text style={styles.voiceSelectText} numberOfLines={1}>
+                {selectedVoice ? selectedVoice.name : 'Ses Seç'}
+              </Text>
+            </TouchableOpacity>
+
             <TouchableOpacity
               style={styles.languageButton}
               onPress={() => {
@@ -482,107 +538,47 @@ const VideoCreationScreen: React.FC<Props> = ({ navigation, route }) => {
               disabled={isGenerating || speechRecognitionState === 'recording'}
             >
               <Text style={styles.languageButtonText}>
-                {SUPPORTED_LANGUAGES.find((l: LanguageOption) => l.code === selectedLanguage)?.flag} {SUPPORTED_LANGUAGES.find((l: LanguageOption) => l.code === selectedLanguage)?.name}
+                {SUPPORTED_LANGUAGES.find((l: LanguageOption) => l.code === selectedLanguage)?.flag}
               </Text>
             </TouchableOpacity>
           </View>
 
-          <TextInput
-            style={styles.scriptInput}
-            placeholder="Enter your script here or use voice input..."
-            placeholderTextColor="#9CA3AF"
-            value={script}
-            onChangeText={setScript}
-            multiline
-            maxLength={MAX_SCRIPT_LENGTH}
-            editable={!isGenerating && speechRecognitionState !== 'recording'}
-            textAlignVertical="top"
-          />
-
-          <View style={styles.scriptFooter}>
-            <Text style={styles.characterCount}>
-              {script.length} / {MAX_SCRIPT_LENGTH}
-            </Text>
-
-            <VoiceInputButton
-              onPress={handleVoiceInput}
-              state={mapSTTState(speechRecognitionState)}
-              duration={recordingDuration}
-              disabled={isGenerating}
+          {/* Text Input with Mic Button */}
+          <View style={styles.inputContainer}>
+            <TextInput
+              style={styles.textInput}
+              placeholder="Avatarın söylemesini istediğin metni yaz..."
+              placeholderTextColor="#9CA3AF"
+              value={script}
+              onChangeText={setScript}
+              multiline
+              maxLength={MAX_SCRIPT_LENGTH}
+              editable={!isGenerating && speechRecognitionState !== 'recording'}
             />
-          </View>
-        </View>
 
-        {/* Avatar Selection */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Avatar</Text>
-          {selectedAvatar ? (
-            <View style={styles.selectedCard}>
-              {selectedAvatar.thumbnailUrl ? (
-                <Image
-                  source={{ uri: selectedAvatar.thumbnailUrl }}
-                  style={styles.avatarThumbnail}
-                  resizeMode="cover"
-                />
-              ) : (
-                <View style={[styles.avatarThumbnail, styles.avatarPlaceholder]}>
-                  <Text style={styles.placeholderIcon}>👤</Text>
+            <TouchableOpacity
+              style={styles.micButton}
+              onPress={handleVoiceInput}
+              disabled={isGenerating}
+              activeOpacity={0.7}
+            >
+              {speechRecognitionState === 'recording' ? (
+                <View style={styles.recordingIndicator}>
+                  <Text style={styles.micIcon}>⏸</Text>
+                  <Text style={styles.recordingTime}>{recordingDuration}s</Text>
                 </View>
+              ) : speechRecognitionState === 'processing' ? (
+                <ActivityIndicator size="small" color="#6366F1" />
+              ) : (
+                <Text style={styles.micIcon}>🎤</Text>
               )}
-              <View style={styles.selectedInfo}>
-                <Text style={styles.selectedName}>{selectedAvatar.name}</Text>
-                <Text style={styles.selectedMeta}>{selectedAvatar.gender}</Text>
-              </View>
-              <TouchableOpacity
-                style={styles.changeButton}
-                onPress={handleSelectAvatar}
-                disabled={isGenerating}
-              >
-                <Text style={styles.changeButtonText}>Change</Text>
-              </TouchableOpacity>
-            </View>
-          ) : (
-            <TouchableOpacity
-              style={styles.selectButton}
-              onPress={handleSelectAvatar}
-              disabled={isGenerating}
-            >
-              <Text style={styles.selectButtonText}>Select Avatar</Text>
             </TouchableOpacity>
-          )}
-        </View>
+          </View>
 
-        {/* Voice Selection */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Voice</Text>
-          {selectedVoice ? (
-            <View style={styles.selectedCard}>
-              <View style={styles.voiceIcon}>
-                <Text style={styles.voiceIconText}>🎤</Text>
-              </View>
-              <View style={styles.selectedInfo}>
-                <Text style={styles.selectedName}>{selectedVoice.name}</Text>
-                <Text style={styles.selectedMeta}>
-                  {selectedVoice.language} • {selectedVoice.gender}
-                </Text>
-              </View>
-              <TouchableOpacity
-                style={styles.changeButton}
-                onPress={handleSelectVoice}
-                disabled={isGenerating}
-              >
-                <Text style={styles.changeButtonText}>Change</Text>
-              </TouchableOpacity>
-            </View>
-          ) : (
-            <TouchableOpacity
-              style={styles.selectButton}
-              onPress={handleSelectVoice}
-              disabled={isGenerating}
-            >
-              <Text style={styles.selectButtonText}>Select Voice</Text>
-            </TouchableOpacity>
-          )}
+          {/* Character Count */}
+          <Text style={styles.characterCount}>
+            {script.length} / {MAX_SCRIPT_LENGTH}
+          </Text>
         </View>
 
         {/* Generation Status */}
@@ -596,7 +592,7 @@ const VideoCreationScreen: React.FC<Props> = ({ navigation, route }) => {
           </View>
         )}
 
-        {/* Generate Button */}
+        {/* Generate Button - Large Blue Button */}
         <TouchableOpacity
           style={[styles.generateButton, !isGenerateEnabled && styles.generateButtonDisabled]}
           onPress={handleGenerateVideo}
@@ -605,7 +601,7 @@ const VideoCreationScreen: React.FC<Props> = ({ navigation, route }) => {
           {isGenerating ? (
             <ActivityIndicator size="small" color="#FFFFFF" />
           ) : (
-            <Text style={styles.generateButtonText}>Generate Video</Text>
+            <Text style={styles.generateButtonText}>Konuş</Text>
           )}
         </TouchableOpacity>
       </ScrollView>
@@ -676,141 +672,198 @@ const VideoCreationScreen: React.FC<Props> = ({ navigation, route }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F9FAFB',
+    backgroundColor: '#FFFFFF',
   },
   scrollView: {
     flex: 1,
   },
   scrollContent: {
     padding: 24,
-  },
-  section: {
-    marginBottom: 24,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 12,
   },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: '600',
+  // Header
+  headerTitle: {
+    fontSize: 28,
+    fontWeight: 'bold',
     color: '#111827',
+    textAlign: 'center',
+    marginBottom: 32,
+    marginTop: 16,
   },
-  languageButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+  // Avatar Section
+  avatarContainer: {
+    width: 280,
+    height: 280,
+    borderRadius: 140,
+    marginBottom: 16,
+    position: 'relative',
     backgroundColor: '#F3F4F6',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-  },
-  languageButtonText: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#374151',
-  },
-  scriptInput: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    padding: 16,
-    fontSize: 16,
-    color: '#111827',
-    minHeight: 150,
-  },
-  scriptFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 8,
   },
-  characterCount: {
-    fontSize: 14,
-    color: '#6B7280',
-  },
-  selectButton: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: '#6366F1',
-    borderStyle: 'dashed',
-    paddingVertical: 20,
-    alignItems: 'center',
-  },
-  selectButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#6366F1',
-  },
-  selectedCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    padding: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  avatarThumbnail: {
-    width: 60,
-    height: 60,
-    borderRadius: 8,
-    backgroundColor: '#F3F4F6',
+  avatarImageLarge: {
+    width: 280,
+    height: 280,
+    borderRadius: 140,
   },
   avatarPlaceholder: {
     justifyContent: 'center',
     alignItems: 'center',
   },
-  placeholderIcon: {
-    fontSize: 32,
-    opacity: 0.5,
+  avatarPlaceholderEmpty: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 3,
+    borderColor: '#E5E7EB',
+    borderStyle: 'dashed',
   },
-  voiceIcon: {
-    width: 60,
-    height: 60,
-    borderRadius: 8,
-    backgroundColor: '#EEF2FF',
+  placeholderIconLarge: {
+    fontSize: 80,
+    opacity: 0.3,
+  },
+  selectAvatarPrompt: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#6B7280',
+    marginTop: 8,
+  },
+  changeAvatarBadge: {
+    position: 'absolute',
+    bottom: 20,
+    right: 20,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#6366F1',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  changeAvatarText: {
+    fontSize: 20,
+  },
+  avatarName: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#111827',
+    marginBottom: 32,
+    textAlign: 'center',
+  },
+  // Input Section
+  inputSection: {
+    width: '100%',
+    marginBottom: 24,
+  },
+  inputHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+    gap: 12,
+  },
+  voiceSelectButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F9FAFB',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    gap: 8,
+  },
+  voiceSelectIcon: {
+    fontSize: 20,
+  },
+  voiceSelectText: {
+    flex: 1,
+    fontSize: 15,
+    fontWeight: '500',
+    color: '#111827',
+  },
+  languageButton: {
+    width: 48,
+    height: 48,
+    borderRadius: 12,
+    backgroundColor: '#F9FAFB',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  voiceIconText: {
-    fontSize: 32,
+  languageButtonText: {
+    fontSize: 24,
   },
-  selectedInfo: {
+  inputContainer: {
+    backgroundColor: '#F9FAFB',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    padding: 16,
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    minHeight: 100,
+    gap: 12,
+  },
+  textInput: {
     flex: 1,
-    marginLeft: 16,
-  },
-  selectedName: {
     fontSize: 16,
-    fontWeight: '600',
     color: '#111827',
-    marginBottom: 4,
+    minHeight: 60,
+    maxHeight: 120,
+    paddingTop: 0,
+    paddingBottom: 0,
   },
-  selectedMeta: {
-    fontSize: 14,
-    color: '#6B7280',
-    textTransform: 'capitalize',
+  micButton: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#FFFFFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
-  changeButton: {
-    backgroundColor: '#F3F4F6',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 8,
+  micIcon: {
+    fontSize: 28,
   },
-  changeButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#6366F1',
+  recordingIndicator: {
+    alignItems: 'center',
+    justifyContent: 'center',
   },
+  recordingTime: {
+    fontSize: 10,
+    fontWeight: 'bold',
+    color: '#EF4444',
+    marginTop: 2,
+  },
+  characterCount: {
+    fontSize: 13,
+    color: '#9CA3AF',
+    marginTop: 8,
+    textAlign: 'right',
+  },
+  // Status Section
   statusSection: {
     backgroundColor: '#EEF2FF',
-    borderRadius: 12,
+    borderRadius: 16,
     padding: 24,
     alignItems: 'center',
     marginBottom: 24,
+    width: '100%',
   },
   statusText: {
     fontSize: 16,
@@ -825,20 +878,36 @@ const styles = StyleSheet.create({
     marginTop: 8,
     textAlign: 'center',
   },
+  // Generate Button
   generateButton: {
-    backgroundColor: '#10B981',
-    borderRadius: 12,
-    paddingVertical: 18,
+    backgroundColor: '#3B82F6',
+    borderRadius: 48,
+    paddingVertical: 20,
+    paddingHorizontal: 48,
     alignItems: 'center',
-    marginTop: 8,
+    justifyContent: 'center',
+    width: '100%',
+    maxWidth: 400,
+    shadowColor: '#3B82F6',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
   },
   generateButtonDisabled: {
     backgroundColor: '#D1D5DB',
+    shadowOpacity: 0,
   },
   generateButtonText: {
-    fontSize: 18,
+    fontSize: 22,
     fontWeight: 'bold',
     color: '#FFFFFF',
+    letterSpacing: 0.5,
+  },
+  // Legacy styles (kept for compatibility)
+  placeholderIcon: {
+    fontSize: 32,
+    opacity: 0.5,
   },
   // Modal styles
   modalOverlay: {

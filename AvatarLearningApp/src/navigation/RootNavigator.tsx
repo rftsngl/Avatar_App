@@ -12,10 +12,14 @@
  * Uses React Navigation Stack Navigator for screen transitions.
  */
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
+import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import { RootStackParamList } from '../types';
+import { PlatformService } from '../services/platform';
+import { SecureStorageService } from '../services/storage';
+import { Logger } from '../utils/Logger';
 
 // Import screens
 import WelcomeScreen from '../screens/onboarding/WelcomeScreen';
@@ -40,10 +44,63 @@ const Stack = createStackNavigator<RootStackParamList>();
  * Root Navigator Component
  */
 const RootNavigator: React.FC = () => {
+  const [isLoading, setIsLoading] = useState(true);
+  const [initialRoute, setInitialRoute] = useState<'Welcome' | 'MainTabs'>('Welcome');
+
+  /**
+   * Check if user has completed onboarding
+   * by checking if API keys exist
+   */
+  useEffect(() => {
+    const checkOnboardingStatus = async () => {
+      try {
+        Logger.info('RootNavigator: Checking onboarding status');
+
+        // Since HeyGen is the only platform, just check if HeyGen API key exists
+        const hasHeyGenKey = await SecureStorageService.hasAPIKey('heygen');
+        
+        if (!hasHeyGenKey) {
+          Logger.info('RootNavigator: No HeyGen API key found, showing onboarding');
+          setInitialRoute('Welcome');
+          setIsLoading(false);
+          return;
+        }
+
+        // Ensure platform is set to HeyGen (force it if not set)
+        const selectedPlatform = await PlatformService.getSelectedPlatform();
+        if (!selectedPlatform || selectedPlatform !== 'heygen') {
+          Logger.info('RootNavigator: Setting platform to HeyGen');
+          await PlatformService.setSelectedPlatform('heygen');
+        }
+
+        // API key exists, skip onboarding
+        Logger.info('RootNavigator: HeyGen API key found, going to main app');
+        setInitialRoute('MainTabs');
+      } catch (error) {
+        Logger.error('RootNavigator: Error checking onboarding status', error);
+        // On error, show onboarding to be safe
+        setInitialRoute('Welcome');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    checkOnboardingStatus();
+  }, []);
+
+  // Show loading screen while checking
+  if (isLoading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#6366F1" />
+      </View>
+    );
+  }
+
   return (
     <NavigationContainer>
       <Stack.Navigator
-        initialRouteName="Welcome"
+        initialRouteName={initialRoute}
         screenOptions={{
           headerStyle: {
             backgroundColor: '#6366F1', // Indigo-500
@@ -167,6 +224,15 @@ const RootNavigator: React.FC = () => {
     </NavigationContainer>
   );
 };
+
+const styles = StyleSheet.create({
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#F9FAFB',
+  },
+});
 
 export default RootNavigator;
 
