@@ -2,11 +2,10 @@
  * Speech Services
  * 
  * ============================================================================
- * MODIFIED: ElevenLabs STT Added (2025-10-27)
+ * ElevenLabs STT Service
  * ============================================================================
  * Native @react-native-voice/voice (SpeechToTextService) is being replaced
  * with ElevenLabs API (ElevenLabsSTTService) for better accuracy.
- * Both services are exported for transition compatibility.
  * ============================================================================
  * 
  * Exports speech-related services
@@ -30,5 +29,6 @@ export type {
   ElevenLabsSTTResult,
   ElevenLabsSTTCallbacks,
 } from './ElevenLabsSTTService';
+
 
 

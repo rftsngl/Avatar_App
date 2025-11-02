@@ -25,6 +25,7 @@ import { Logger } from '../utils/Logger';
 import WelcomeScreen from '../screens/onboarding/WelcomeScreen';
 import PlatformSelectionScreen from '../screens/onboarding/PlatformSelectionScreen';
 import APIKeySetupScreen from '../screens/onboarding/APIKeySetupScreen';
+import ConfigureAPIKeysScreen from '../screens/settings/ConfigureAPIKeysScreen';
 import MainTabNavigator from './MainTabNavigator';
 import VideoPlaybackScreen from '../screens/video/VideoPlaybackScreen';
 import TemplateSelectionScreen from '../screens/video/TemplateSelectionScreen';
@@ -36,6 +37,8 @@ import PlatformManagementScreen from '../screens/settings/PlatformManagementScre
 // import { AvatarProfileManagementScreen } from '../screens/avatar/AvatarProfileManagementScreen';
 import PhotoAvatarManagementScreen from '../screens/avatar/PhotoAvatarManagementScreen';
 import PhotoAvatarCreationScreen from '../screens/avatar/PhotoAvatarCreationScreen';
+import { LearningContainer } from '../screens/learning';
+import LearningSettingsScreen from '../screens/settings/LearningSettingsScreen';
 // Settings screen is in MainTabNavigator (bottom tabs)
 
 const Stack = createStackNavigator<RootStackParamList>();
@@ -138,6 +141,15 @@ const RootNavigator: React.FC = () => {
           }}
         />
 
+        {/* API Configuration Screen */}
+        <Stack.Screen
+          name="ConfigureAPIKeys"
+          component={ConfigureAPIKeysScreen}
+          options={{
+            title: 'Configure API Keys',
+          }}
+        />
+
         {/* Main App with Bottom Tabs */}
         <Stack.Screen
           name="MainTabs"
@@ -216,6 +228,26 @@ const RootNavigator: React.FC = () => {
           component={PhotoAvatarCreationScreen}
           options={{
             title: 'Create Instant Video',
+          }}
+        />
+
+        {/* Learning System (AI-powered language learning) */}
+        <Stack.Screen
+          name="Learning"
+          component={LearningContainer}
+          options={{
+            title: 'Language Learning',
+            headerShown: true,
+            gestureEnabled: true,
+          }}
+        />
+
+        {/* Learning Settings (API Configuration) */}
+        <Stack.Screen
+          name="LearningSettings"
+          component={LearningSettingsScreen}
+          options={{
+            title: 'Learning AI Services',
           }}
         />
 

@@ -263,6 +263,34 @@ const PlatformSelectionScreen: React.FC<Props> = ({ navigation }) => {
             {isLoading ? 'Loading...' : 'Continue with HeyGen'}
           </Text>
         </TouchableOpacity>
+        
+        <TouchableOpacity
+          style={styles.skipButton}
+          onPress={() => {
+            Logger.info('User chose to skip platform setup');
+            Alert.alert(
+              'Skip Platform Setup?',
+              'You can set up your API keys later in Settings. You won\'t be able to create videos until you add an API key.',
+              [
+                { text: 'Go Back', style: 'cancel' },
+                {
+                  text: 'Skip for Now',
+                  style: 'default',
+                  onPress: () => {
+                    // Navigate directly to MainTabs
+                    navigation.reset({
+                      index: 0,
+                      routes: [{ name: 'MainTabs' }],
+                    });
+                  },
+                },
+              ]
+            );
+          }}
+          disabled={isLoading}
+        >
+          <Text style={styles.skipButtonText}>Skip for Now</Text>
+        </TouchableOpacity>
       </View>
     </View>
   );
@@ -452,6 +480,7 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     borderRadius: 8,
     alignItems: 'center',
+    marginBottom: 12,
   },
   continueButtonDisabled: {
     backgroundColor: '#D1D5DB',
@@ -460,6 +489,17 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 18,
     fontWeight: 'bold',
+  },
+  skipButton: {
+    backgroundColor: 'transparent',
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  skipButtonText: {
+    color: '#6B7280',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });
 

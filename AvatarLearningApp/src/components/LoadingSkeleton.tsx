@@ -1,11 +1,17 @@
 /**
  * Loading Skeleton Component
  * 
- * Provides skeleton loading states for better UX while content is loading.
+ * Provides skeleton loading states with shimmer animation for better UX.
+ * Enhanced with smooth opacity transitions.
+ * 
+ * @author Avatar Learning App
+ * @date 2025-11-02
  */
 
 import React, { useEffect, useRef } from 'react';
 import { View, StyleSheet, Animated, ViewStyle } from 'react-native';
+import { shimmer } from '../utils/animationUtils';
+import Colors, { BorderRadius, Spacing, Shadows } from '../constants/colors';
 
 /**
  * Skeleton props
@@ -18,36 +24,28 @@ interface SkeletonProps {
 }
 
 /**
- * Single Skeleton Component
+ * Single Skeleton Component with enhanced shimmer animation
  */
 export const Skeleton: React.FC<SkeletonProps> = ({
   width = '100%',
   height = 20,
-  borderRadius = 4,
+  borderRadius = BorderRadius.xs,
   style,
 }) => {
-  const opacity = useRef(new Animated.Value(0.3)).current;
+  const shimmerAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    const animation = Animated.loop(
-      Animated.sequence([
-        Animated.timing(opacity, {
-          toValue: 1,
-          duration: 800,
-          useNativeDriver: true,
-        }),
-        Animated.timing(opacity, {
-          toValue: 0.3,
-          duration: 800,
-          useNativeDriver: true,
-        }),
-      ])
-    );
-
+    const animation = shimmer(shimmerAnim);
     animation.start();
 
     return () => animation.stop();
-  }, [opacity]);
+  }, [shimmerAnim]);
+
+  // Interpolate shimmer animation for smooth wave effect
+  const translateX = shimmerAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [-200, 200],
+  });
 
   return (
     <View
@@ -63,10 +61,9 @@ export const Skeleton: React.FC<SkeletonProps> = ({
     >
       <Animated.View
         style={[
-          StyleSheet.absoluteFill,
+          styles.shimmer,
           {
-            opacity,
-            backgroundColor: '#E5E7EB',
+            transform: [{ translateX }],
           },
         ]}
       />
@@ -80,9 +77,9 @@ export const Skeleton: React.FC<SkeletonProps> = ({
 export const AvatarCardSkeleton: React.FC = () => {
   return (
     <View style={styles.avatarCard}>
-      <Skeleton width="100%" height={150} borderRadius={12} />
+      <Skeleton width="100%" height={150} borderRadius={BorderRadius.md} />
       <View style={styles.avatarCardContent}>
-        <Skeleton width="80%" height={16} style={{ marginBottom: 8 }} />
+        <Skeleton width="80%" height={16} style={{ marginBottom: Spacing.xs }} />
         <Skeleton width="50%" height={14} />
       </View>
     </View>
@@ -97,7 +94,7 @@ export const VoiceCardSkeleton: React.FC = () => {
     <View style={styles.voiceCard}>
       <Skeleton width={60} height={60} borderRadius={30} />
       <View style={styles.voiceCardContent}>
-        <Skeleton width="70%" height={16} style={{ marginBottom: 8 }} />
+        <Skeleton width="70%" height={16} style={{ marginBottom: Spacing.xs }} />
         <Skeleton width="50%" height={14} />
       </View>
     </View>
@@ -110,10 +107,10 @@ export const VoiceCardSkeleton: React.FC = () => {
 export const VideoCardSkeleton: React.FC = () => {
   return (
     <View style={styles.videoCard}>
-      <Skeleton width="100%" height={200} borderRadius={12} />
+      <Skeleton width="100%" height={200} borderRadius={BorderRadius.md} />
       <View style={styles.videoCardContent}>
-        <Skeleton width="90%" height={18} style={{ marginBottom: 8 }} />
-        <Skeleton width="60%" height={14} style={{ marginBottom: 8 }} />
+        <Skeleton width="90%" height={18} style={{ marginBottom: Spacing.xs }} />
+        <Skeleton width="60%" height={14} style={{ marginBottom: Spacing.xs }} />
         <Skeleton width="40%" height={14} />
       </View>
     </View>
@@ -150,46 +147,56 @@ export const ListSkeleton: React.FC<ListSkeletonProps> = ({ count = 6, type = 'a
  */
 const styles = StyleSheet.create({
   skeleton: {
-    backgroundColor: '#E5E7EB',
+    backgroundColor: Colors.gray200,
+    overflow: 'hidden',
+  },
+  shimmer: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: Colors.white,
+    opacity: 0.3,
+    width: 100,
   },
   listContainer: {
-    padding: 16,
+    padding: Spacing.md,
   },
   avatarCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    marginBottom: 16,
+    backgroundColor: Colors.white,
+    borderRadius: BorderRadius.md,
+    marginBottom: Spacing.md,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: Colors.border,
+    ...Shadows.small,
   },
   avatarCardContent: {
-    padding: 12,
+    padding: Spacing.md,
   },
   voiceCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
+    backgroundColor: Colors.white,
+    borderRadius: BorderRadius.md,
+    padding: Spacing.md,
+    marginBottom: Spacing.sm,
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: Colors.border,
+    ...Shadows.small,
   },
   voiceCardContent: {
-    marginLeft: 16,
+    marginLeft: Spacing.md,
     flex: 1,
   },
   videoCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    marginBottom: 16,
+    backgroundColor: Colors.white,
+    borderRadius: BorderRadius.md,
+    marginBottom: Spacing.md,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: Colors.border,
+    ...Shadows.small,
   },
   videoCardContent: {
-    padding: 16,
+    padding: Spacing.md,
   },
 });
 

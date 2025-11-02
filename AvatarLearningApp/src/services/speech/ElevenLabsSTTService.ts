@@ -20,8 +20,15 @@
  * - Support for 13 languages
  */
 
-import axios, { AxiosError } from 'axios';
-import AudioRecorderPlayer from 'react-native-audio-recorder-player';
+import axios, { AxiosError, AxiosResponse } from 'axios';
+import AudioRecorderPlayer, {
+  AudioEncoderAndroidType,
+  AudioSourceAndroidType,
+  OutputFormatAndroidType,
+  AVEncodingOption,
+  AVEncoderAudioQualityIOSType,
+  AVLinearPCMBitDepthKeyIOSType,
+} from 'react-native-audio-recorder-player';
 import RNFS from 'react-native-fs';
 import { LogBox, Platform, EmitterSubscription } from 'react-native';
 import { SecureStorageService } from '../storage/SecureStorageService';
@@ -69,13 +76,34 @@ const ELEVENLABS_API_KEY_STORAGE = 'elevenlabs_api_key';
 
 /**
  * Audio recording configuration
+ * 
+ * ANDROID DEVICE COMPATIBILITY NOTE:
+ * - Many modern Android devices use AAC in M4A/3GP container
+ * - iOS: Uses LPCM (Linear PCM) format for high quality
+ * 
+ * USER IMPACT:
+ * - Android & iOS: Both use simple word-matching accuracy
+ * - No detailed pronunciation assessment (requires Speech SDK)
+ * 
+ * AUDIO FORMAT:
+ * - Android: AAC encoder in MPEG-4 container (M4A)
+ * - iOS: LPCM (uncompressed PCM audio)
+ * - Sample rate: 16kHz (optimal for speech)
+ * - Channels: Mono (1 channel)
  */
 const AUDIO_CONFIG = {
-  AudioEncoderAndroid: 'aac',
-  AudioSourceAndroid: 'MIC',
-  AVEncoderAudioQualityKeyIOS: 'high',
+  AudioEncoderAndroid: AudioEncoderAndroidType.AAC,
+  AudioSourceAndroid: AudioSourceAndroidType.MIC,
+  OutputFormatAndroid: OutputFormatAndroidType.MPEG_4,  // M4A container
+  AudioSamplingRateAndroid: 16000,  // 16kHz for speech
+  AudioChannelsAndroid: 1,  // Mono
+  AVEncoderAudioQualityKeyIOS: AVEncoderAudioQualityIOSType.high,
   AVNumberOfChannelsKeyIOS: 1,
-  AVFormatIDKeyIOS: 'kAudioFormatMPEG4AAC',
+  AVFormatIDKeyIOS: AVEncodingOption.lpcm,  // PCM for iOS
+  AVSampleRateKeyIOS: 16000,  // 16kHz for speech
+  AVLinearPCMBitDepthKeyIOS: AVLinearPCMBitDepthKeyIOSType.bit16,  // 16-bit
+  AVLinearPCMIsBigEndianKeyIOS: false,
+  AVLinearPCMIsFloatKeyIOS: false,
 };
 
 /**
@@ -147,6 +175,7 @@ export class ElevenLabsSTTService {
   private static recordingPath: string | null = null;
   private static isInitialized = false;
   private static recordingSubscription: unknown = null;
+  private static lastTranscription: string | null = null; // ← Cache for last transcription
 
   /**
    * Initialize the ElevenLabs STT service
@@ -164,6 +193,7 @@ export class ElevenLabsSTTService {
       this.currentLanguage = language;
       this.callbacks = callbacks;
       this.isInitialized = true;
+      this.lastTranscription = null; // Reset cached transcription
 
       Logger.info('ElevenLabsSTTService: Initialized successfully');
     } catch (error) {
@@ -203,8 +233,19 @@ export class ElevenLabsSTTService {
         await this.initialize(language || this.currentLanguage);
       }
 
-      if (this.currentState !== 'idle') {
-        Logger.warn('ElevenLabsSTTService: Already recording or processing');
+      // Reset state if in error state
+      if (this.currentState === 'error') {
+        this.currentState = 'idle';
+        Logger.info('ElevenLabsSTTService: Resetting from error state');
+      }
+
+      if (this.currentState === 'recording') {
+        Logger.warn('ElevenLabsSTTService: Already recording');
+        return;
+      }
+
+      if (this.currentState === 'processing') {
+        Logger.warn('ElevenLabsSTTService: Still processing previous recording');
         return;
       }
 
@@ -214,11 +255,13 @@ export class ElevenLabsSTTService {
       Logger.info('ElevenLabsSTTService: Starting audio recording', { language: languageToUse });
 
       // Generate unique file path for recording
+      // Platform-specific extensions: .m4a for Android (AAC), .wav for iOS (LPCM)
       const timestamp = Date.now();
-      this.recordingPath = `${RNFS.DocumentDirectoryPath}/recording_${timestamp}.m4a`;
+      const extension = Platform.OS === 'ios' ? 'wav' : 'm4a';
+      this.recordingPath = `${RNFS.DocumentDirectoryPath}/recording_${timestamp}.${extension}`;
 
-      // Start recording
-      await this.audioRecorder.startRecorder(this.recordingPath);
+      // Start recording with platform-optimized configuration
+      await this.audioRecorder.startRecorder(this.recordingPath, AUDIO_CONFIG);
 
       // Set up recording progress listener (safely)
       // Remove any existing listener first
@@ -259,16 +302,30 @@ export class ElevenLabsSTTService {
   }
 
   /**
-   * Stop recording and process audio with ElevenLabs API
+   * Stop listening and process the recording
+   * 
+   * @returns Path to the recorded audio file (before cleanup)
    */
-  static async stopListening(): Promise<void> {
+  /**
+   * Stop listening and process the recording
+   * Returns audio file path and transcription
+   */
+  static async stopListening(): Promise<{ audioFilePath: string; transcription: string }> {
     try {
-      if (this.currentState !== 'recording') {
-        Logger.warn('ElevenLabsSTTService: Not recording');
-        return;
+      // Allow stopping from 'recording' or 'processing' states
+      if (this.currentState !== 'recording' && this.currentState !== 'processing') {
+        Logger.warn('ElevenLabsSTTService: Not in recording state', { state: this.currentState });
+        
+        // If already idle, might be a double-call - return empty path
+        if (this.currentState === 'idle') {
+          throw ErrorHandler.createError(
+            ErrorCode.UNKNOWN_ERROR,
+            'Not currently recording'
+          );
+        }
       }
 
-      Logger.info('ElevenLabsSTTService: Stopping recording');
+      Logger.info('ElevenLabsSTTService: Stopping recording', { state: this.currentState });
 
       // Stop recording
       const result = await this.audioRecorder.stopRecorder();
@@ -292,11 +349,21 @@ export class ElevenLabsSTTService {
         );
       }
 
+      // Save the recording path before processing
+      const savedRecordingPath = this.recordingPath;
+
       // Process with ElevenLabs API
       await this.processRecording(this.recordingPath);
 
       this.currentState = 'idle';
       this.callbacks.onEnd?.();
+
+      // Return both audio path and transcription
+      // This allows ISE assessment to use the file and immediate access to text
+      return {
+        audioFilePath: savedRecordingPath,
+        transcription: this.lastTranscription || '',
+      };
     } catch (error) {
       Logger.error('ElevenLabsSTTService: Failed to stop recording', error);
       this.currentState = 'error';
@@ -306,13 +373,22 @@ export class ElevenLabsSTTService {
         ErrorCode.UNKNOWN_ERROR,
         'Failed to stop audio recording'
       );
-    } finally {
-      // Clean up recording file
+    }
+  }
+
+  /**
+   * Clean up the recording file after ISE assessment
+   * Call this after you're done with pronunciation evaluation
+   */
+  static async cleanupRecording(): Promise<void> {
+    try {
       if (this.recordingPath && (await RNFS.exists(this.recordingPath))) {
         await RNFS.unlink(this.recordingPath);
         Logger.info('ElevenLabsSTTService: Recording file cleaned up');
       }
       this.recordingPath = null;
+    } catch (error) {
+      Logger.error('ElevenLabsSTTService: Failed to cleanup recording', error);
     }
   }
 
@@ -387,6 +463,22 @@ export class ElevenLabsSTTService {
         path: audioFilePath,
       });
 
+      // Validate audio file size (minimum 1KB)
+      if (fileStat.size < 1000) {
+        Logger.warn('ElevenLabsSTTService: Audio file too small, likely silent', {
+          size: fileStat.size,
+        });
+        
+        // Return empty result for silent/corrupt recordings
+        const emptyResult: ElevenLabsSTTResult = {
+          text: '',
+          language: this.currentLanguage,
+          confidence: 0,
+        };
+        this.callbacks.onResult?.(emptyResult);
+        return;
+      }
+
       // Create FormData with proper file URI format
       // React Native FormData requires platform-specific URI handling
       const formData = new FormData();
@@ -396,11 +488,26 @@ export class ElevenLabsSTTService {
         ? audioFilePath 
         : `file://${audioFilePath}`;
 
+      // Detect file type from extension
+      const fileExtension = audioFilePath.toLowerCase().split('.').pop() || 'wav';
+      let mimeType = 'audio/wav';  // Default for iOS
+      
+      // Platform-specific MIME types
+      if (fileExtension === 'm4a') {
+        mimeType = 'audio/m4a';  // Android AAC/MP4
+      } else if (fileExtension === 'wav') {
+        mimeType = 'audio/wav';  // iOS LPCM
+      } else if (fileExtension === 'amr') {
+        mimeType = 'audio/amr';  // Fallback (device dependent)
+      }
+      
+      const fileName = `recording.${fileExtension}`;
+
       // ElevenLabs API requires 'file' field name (not 'audio')
       formData.append('file', {
         uri: fileUri,
-        type: 'audio/m4a',
-        name: 'recording.m4a',
+        type: mimeType,
+        name: fileName,
       } as any);
       
       // Add model_id parameter
@@ -413,20 +520,16 @@ export class ElevenLabsSTTService {
         model: STT_MODEL,
         language: languageCode,
         fileUri,
+        mimeType,
         endpoint: STT_ENDPOINT,
       });
 
-      // Send request to ElevenLabs API
-      const response = await axios.post<ElevenLabsSTTResponse>(
+      // Send request with retry logic for rate limits
+      const response = await this.sendRequestWithRetry(
         STT_ENDPOINT,
         formData,
-        {
-          headers: {
-            'xi-api-key': apiKey,
-            'Content-Type': 'multipart/form-data',
-          },
-          timeout: REQUEST_TIMEOUT,
-        }
+        apiKey,
+        3 // Max 3 attempts
       );
 
       Logger.info('ElevenLabsSTTService: Response received', {
@@ -448,6 +551,9 @@ export class ElevenLabsSTTService {
         language: languageCode,
         confidence: 1.0, // ElevenLabs doesn't provide confidence scores
       };
+
+      // Cache the transcription for immediate access
+      this.lastTranscription = result.text;
 
       Logger.info('ElevenLabsSTTService: Transcription successful', {
         text: result.text,
@@ -484,6 +590,87 @@ export class ElevenLabsSTTService {
         'Failed to process audio with ElevenLabs'
       );
     }
+  }
+
+  /**
+   * Send request with exponential backoff retry for rate limits
+   * 
+   * @param url - API endpoint URL
+   * @param formData - FormData to send
+   * @param apiKey - ElevenLabs API key
+   * @param maxAttempts - Maximum retry attempts
+   * @returns API response
+   */
+  private static async sendRequestWithRetry(
+    url: string,
+    formData: FormData,
+    apiKey: string,
+    maxAttempts: number = 3
+  ): Promise<AxiosResponse<ElevenLabsSTTResponse>> {
+    let lastError: Error | null = null;
+
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        Logger.info('ElevenLabsSTTService: Sending request', {
+          attempt,
+          maxAttempts,
+        });
+
+        const response = await axios.post<ElevenLabsSTTResponse>(
+          url,
+          formData,
+          {
+            headers: {
+              'xi-api-key': apiKey,
+              'Content-Type': 'multipart/form-data',
+            },
+            timeout: REQUEST_TIMEOUT,
+          }
+        );
+
+        // Success - return response
+        Logger.info('ElevenLabsSTTService: Request successful', { attempt });
+        return response;
+
+      } catch (error) {
+        lastError = error as Error;
+
+        // Check if it's a rate limit error (429)
+        if (axios.isAxiosError(error) && error.response?.status === 429) {
+          // Calculate exponential backoff delay: 2s, 4s, 8s
+          const delaySeconds = Math.pow(2, attempt);
+          
+          if (attempt < maxAttempts) {
+            Logger.warn('ElevenLabsSTTService: Rate limit hit, retrying', {
+              attempt,
+              maxAttempts,
+              delaySeconds,
+              retryAfter: `${delaySeconds}s`,
+            });
+
+            // Wait before retrying
+            await new Promise(resolve => setTimeout(resolve, delaySeconds * 1000));
+            continue; // Try again
+          } else {
+            Logger.error('ElevenLabsSTTService: Max retry attempts reached', {
+              attempt,
+              maxAttempts,
+            });
+            // Fall through to throw error
+          }
+        } else {
+          // Non-retryable error (network, auth, etc.) - throw immediately
+          Logger.error('ElevenLabsSTTService: Non-retryable error', {
+            error,
+            attempt,
+          });
+          throw error;
+        }
+      }
+    }
+
+    // All retries exhausted
+    throw lastError || new Error('Request failed after all retry attempts');
   }
 
   /**

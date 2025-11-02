@@ -33,6 +33,7 @@ import { VoiceCloneStorageService } from '../../services/voice/VoiceCloneStorage
 import { AvatarStorageService } from '../../services/avatar/AvatarStorageService';
 import { HeyGenService } from '../../services/heygen/HeyGenService';
 import { SecureStorageService } from '../../services/storage/SecureStorageService';
+import { AnimatedButton } from '../../components/common/AnimatedButton';
 import { Logger } from '../../utils/Logger';
 import { HapticUtils } from '../../utils/hapticUtils';
 
@@ -64,7 +65,6 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) => {
   const [selectedPlatform, setSelectedPlatform] = useState<PlatformType | null>(null);
   const [didConfigured, setDidConfigured] = useState(false);
   const [heygenConfigured, setHeygenConfigured] = useState(false);
-  const [elevenlabsConfigured, setElevenlabsConfigured] = useState(false);
   const [voiceProfileCount, setVoiceProfileCount] = useState(0);
   const [avatarProfileCount, setAvatarProfileCount] = useState(0);
   const [videoCount, setVideoCount] = useState(0);
@@ -110,10 +110,6 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) => {
       setSelectedPlatform(platformState.selectedPlatform);
       setDidConfigured(platformState.didConfig.isConfigured);
       setHeygenConfigured(platformState.heygenConfig.isConfigured);
-
-      // Check if ElevenLabs is configured
-      const elevenlabsAPIKey = await SecureStorageService.getElevenLabsAPIKey();
-      setElevenlabsConfigured(!!elevenlabsAPIKey);
 
       // Load credits if HeyGen is configured and selected
       if (platformState.selectedPlatform === 'heygen' && platformState.heygenConfig.isConfigured) {
@@ -237,49 +233,6 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) => {
             } else {
               HapticUtils.error();
               Alert.alert('Error', 'Failed to switch platform');
-            }
-          },
-        },
-      ]
-    );
-  };
-
-  /**
-   * Handle configure ElevenLabs API key
-   */
-  const handleConfigureElevenLabs = () => {
-    HapticUtils.light();
-    // ElevenLabs için özel bir parametre veya ekran kullanın
-    navigation.navigate('APIKeySetup', { platform: 'elevenlabs' as any });
-    // VEYA: Ayrı bir ElevenLabs yapılandırma ekranı oluşturun
-    // navigation.navigate('ElevenLabsSetup');
-  };
-
-  /**
-   * Handle remove ElevenLabs API key
-   */
-  const handleRemoveElevenLabsAPIKey = () => {
-    HapticUtils.light();
-
-    Alert.alert(
-      'Remove ElevenLabs API Key',
-      'This will remove your ElevenLabs API key. Speech-to-text feature will no longer work until you configure it again.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Remove',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await SecureStorageService.deleteElevenLabsAPIKey();
-              setElevenlabsConfigured(false);
-              HapticUtils.success();
-              Alert.alert('Success', 'ElevenLabs API key removed');
-              Logger.info('SettingsScreen: ElevenLabs API key removed');
-            } catch (error) {
-              Logger.error('SettingsScreen: Failed to remove ElevenLabs API key', error);
-              HapticUtils.error();
-              Alert.alert('Error', 'Failed to remove API key');
             }
           },
         },
@@ -463,55 +416,29 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) => {
           </View>
         )}
 
-        {/* ElevenLabs STT Service Section */}
+        {/* API Configuration Section */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Speech-to-Text Service</Text>
+          <Text style={styles.sectionTitle}>API Configuration</Text>
           
-          <View style={styles.platformCard}>
-            <View style={styles.platformCardHeader}>
-              <Text style={styles.platformCardTitle}>ElevenLabs API</Text>
-              <View style={[
-                styles.activeBadge,
-                { backgroundColor: elevenlabsConfigured ? '#10B981' : '#EF4444' }
-              ]}>
-                <Text style={styles.activeBadgeText}>
-                  {elevenlabsConfigured ? 'Configured' : 'Not Configured'}
+          <TouchableOpacity
+            style={styles.menuItem}
+            onPress={() => {
+              HapticUtils.light();
+              navigation.navigate('ConfigureAPIKeys');
+            }}
+            activeOpacity={0.7}
+          >
+            <View style={styles.menuItemLeft}>
+              <Text style={styles.menuItemIcon}>🔑</Text>
+              <View>
+                <Text style={styles.menuItemTitle}>Configure API Keys</Text>
+                <Text style={styles.menuItemSubtitle}>
+                  Manage HeyGen, ElevenLabs, Gemini & iFlytek keys
                 </Text>
               </View>
             </View>
-            <Text style={styles.platformCardDescription}>
-              Required for speech-to-text input in 13 languages
-            </Text>
-            
-            <View style={styles.platformCardButtons}>
-              {elevenlabsConfigured ? (
-                <>
-                  <TouchableOpacity
-                    style={[styles.platformButton, styles.platformButtonPrimary]}
-                    onPress={handleConfigureElevenLabs}
-                    activeOpacity={0.7}
-                  >
-                    <Text style={styles.platformButtonText}>Update Key</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[styles.platformButton, styles.platformButtonDanger]}
-                    onPress={handleRemoveElevenLabsAPIKey}
-                    activeOpacity={0.7}
-                  >
-                    <Text style={styles.platformButtonTextDanger}>Remove</Text>
-                  </TouchableOpacity>
-                </>
-              ) : (
-                <TouchableOpacity
-                  style={[styles.platformButton, styles.platformButtonPrimary]}
-                  onPress={handleConfigureElevenLabs}
-                  activeOpacity={0.7}
-                >
-                  <Text style={styles.platformButtonText}>Configure API Key</Text>
-                </TouchableOpacity>
-              )}
-            </View>
-          </View>
+            <Text style={styles.menuItemArrow}>›</Text>
+          </TouchableOpacity>
         </View>
 
         {/* Content Management Section */}
@@ -646,13 +573,13 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) => {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Danger Zone</Text>
 
-          <TouchableOpacity
-            style={styles.dangerButton}
+          <AnimatedButton
+            title="Clear All Data"
             onPress={handleClearAllData}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.dangerButtonText}>Clear All Data</Text>
-          </TouchableOpacity>
+            variant="danger"
+            size="medium"
+            fullWidth={true}
+          />
         </View>
 
         {/* Footer */}

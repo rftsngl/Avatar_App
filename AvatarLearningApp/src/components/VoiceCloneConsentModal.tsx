@@ -5,7 +5,7 @@
  * Must be accepted before users can clone their voice.
  */
 
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -14,9 +14,12 @@ import {
   TouchableOpacity,
   StyleSheet,
   Platform,
+  Animated,
 } from 'react-native';
 import { VOICE_CLONE_PRIVACY_NOTICE, VOICE_CLONE_CONSENT_VERSION } from '../constants/voiceCloneConsent';
 import { AsyncStorageService } from '../services/storage/AsyncStorageService';
+import Colors, { Shadows, BorderRadius, Spacing, Opacity } from '../constants/colors';
+import { fadeIn, slideUp, fadeOut, slideDown } from '../utils/animationUtils';
 import { Logger } from '../utils/Logger';
 import { HapticUtils } from '../utils/hapticUtils';
 
@@ -38,6 +41,29 @@ export const VoiceCloneConsentModal: React.FC<VoiceCloneConsentModalProps> = ({
 }) => {
   const [hasReadToBottom, setHasReadToBottom] = useState(false);
   const [consentChecked, setConsentChecked] = useState(false);
+
+  // Animation values
+  const backdropOpacity = useRef(new Animated.Value(0)).current;
+  const modalSlideY = useRef(new Animated.Value(50)).current;
+
+  /**
+   * Animate modal entrance/exit
+   */
+  useEffect(() => {
+    if (visible) {
+      // Entrance animation
+      Animated.parallel([
+        fadeIn(backdropOpacity),
+        slideUp(modalSlideY, 50),
+      ]).start();
+    } else {
+      // Exit animation
+      Animated.parallel([
+        fadeOut(backdropOpacity),
+        slideDown(modalSlideY, 50),
+      ]).start();
+    }
+  }, [visible, backdropOpacity, modalSlideY]);
 
   /**
    * Handle scroll to detect if user has read to bottom
@@ -103,13 +129,23 @@ export const VoiceCloneConsentModal: React.FC<VoiceCloneConsentModalProps> = ({
   return (
     <Modal
       visible={visible}
-      animationType="slide"
+      animationType="none"
       transparent={true}
       onRequestClose={handleDecline}
       onDismiss={handleModalClose}
     >
-      <View style={styles.modalOverlay}>
-        <View style={styles.modalContainer}>
+      <Animated.View style={[styles.modalOverlay, { opacity: backdropOpacity }]}>
+        <TouchableOpacity 
+          style={StyleSheet.absoluteFill} 
+          activeOpacity={1} 
+          onPress={handleDecline}
+        />
+        <Animated.View 
+          style={[
+            styles.modalContainer,
+            { transform: [{ translateY: modalSlideY }] }
+          ]}
+        >
           {/* Header */}
           <View style={styles.header}>
             <Text style={styles.headerTitle}>Voice Cloning Consent</Text>
@@ -182,8 +218,8 @@ export const VoiceCloneConsentModal: React.FC<VoiceCloneConsentModalProps> = ({
               </Text>
             </TouchableOpacity>
           </View>
-        </View>
-      </View>
+        </Animated.View>
+      </Animated.View>
     </Modal>
   );
 };
@@ -191,27 +227,17 @@ export const VoiceCloneConsentModal: React.FC<VoiceCloneConsentModalProps> = ({
 const styles = StyleSheet.create({
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: Colors.overlay,
     justifyContent: 'center',
     alignItems: 'center',
   },
   modalContainer: {
     width: '90%',
     maxHeight: '85%',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 20,
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.3,
-        shadowRadius: 8,
-      },
-      android: {
-        elevation: 8,
-      },
-    }),
+    backgroundColor: Colors.white,
+    borderRadius: BorderRadius.xl,
+    padding: Spacing.lg,
+    ...Shadows.xl,
   },
   header: {
     marginBottom: 16,

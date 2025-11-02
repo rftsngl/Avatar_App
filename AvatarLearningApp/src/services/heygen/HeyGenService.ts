@@ -113,9 +113,16 @@ export class HeyGenService {
 
     try {
       const apiKey = await this.getAPIKey();
+      const url = `${HEYGEN_API_BASE_URL}/v2/avatars`;
+      
+      Logger.info('HeyGenService: Making API request', {
+        url,
+        hasApiKey: !!apiKey,
+        apiKeyLength: apiKey?.length || 0,
+      });
 
       const response = await axios.get<HeyGenAvatarsResponse>(
-        `${HEYGEN_API_BASE_URL}/v2/avatars`,
+        url,
         {
           headers: {
             'X-Api-Key': apiKey,
@@ -1027,8 +1034,20 @@ export class HeyGenService {
         }
       );
 
+      // DEBUG: Log full response to diagnose issue
+      Logger.info('HeyGenService: Full API response', { 
+        fullResponse: JSON.stringify(response.data, null, 2)
+      });
+
       // Extract quota from nested data structure
       const quota = response.data?.data?.remaining_quota;
+      
+      Logger.info('HeyGenService: Extracted quota value', { 
+        quota,
+        type: typeof quota,
+        rawData: response.data?.data
+      });
+
       if (quota === undefined || quota === null || isNaN(quota)) {
         Logger.warn('HeyGenService: Invalid quota value received', { 
           response: response.data 

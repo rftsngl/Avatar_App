@@ -17,7 +17,7 @@ import { MainTabParamList } from '../types';
 import { Text, StyleSheet } from 'react-native';
 
 // Import screens
-import VideoCreationScreen from '../screens/video/VideoCreationScreen';
+import { VideoTabContainer } from '../screens/video';
 import VideoArchiveScreen from '../screens/video/VideoArchiveScreen';
 import AvatarCatalogScreen from '../screens/avatar/AvatarCatalogScreen';
 import VoiceCatalogScreen from '../screens/voice/VoiceCatalogScreen';
@@ -68,9 +68,9 @@ const MainTabNavigator: React.FC = () => {
     >
       <Tab.Screen
         name="VideoCreation"
-        component={VideoCreationScreen}
+        component={VideoTabContainer}
         options={{
-          title: 'Create Video',
+          title: 'Video',
           tabBarLabel: 'Video',
           tabBarIcon: ({ focused }) => <TabIcon icon="🎬" focused={focused} />,
         }}

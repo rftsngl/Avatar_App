@@ -1,11 +1,10 @@
 /**
- * Video Creation Screen
+ * Create Video Screen
  *
  * ============================================================================
- * MODIFIED: ElevenLabs STT Integration (2025-10-27)
+ * MODIFIED: Extracted from VideoCreationScreen (2025-11-01)
  * ============================================================================
- * Replaced native @react-native-voice/voice with ElevenLabs API for better
- * speech-to-text accuracy. All 13 languages still supported.
+ * This is the video creation tab within VideoTabContainer.
  * ============================================================================
  *
  * Allows users to create AI-generated videos by:
@@ -30,8 +29,9 @@ import {
   Platform,
   Modal,
 } from 'react-native';
+import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
-import { RouteProp, useFocusEffect } from '@react-navigation/native';
+import { RouteProp } from '@react-navigation/native';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { RootStackParamList, MainTabParamList, Avatar, Voice, VideoStatus, VideoMetadata, SpeechLanguage, LanguageOption } from '../../types';
 import { PlatformService } from '../../services/platform';
@@ -45,23 +45,13 @@ import { ErrorHandler } from '../../utils/ErrorHandler';
 import { HapticUtils } from '../../utils/hapticUtils';
 import { PermissionUtils } from '../../utils/permissionUtils';
 import { AsyncStorageService } from '../../services/storage';
-import { AnimatedButton } from '../../components/common/AnimatedButton';
-
-type VideoCreationScreenNavigationProp = BottomTabNavigationProp<
-  MainTabParamList,
-  'VideoCreation'
->;
-
-type VideoCreationScreenRouteProp = RouteProp<MainTabParamList, 'VideoCreation'>;
-
-interface Props {
-  navigation: VideoCreationScreenNavigationProp;
-  route: VideoCreationScreenRouteProp;
-}
 
 const MAX_SCRIPT_LENGTH = 1000;
 
-const VideoCreationScreen: React.FC<Props> = ({ navigation, route }) => {
+export const CreateVideoScreen: React.FC = () => {
+  const navigation = useNavigation<BottomTabNavigationProp<MainTabParamList, 'VideoCreation'>>();
+  const route = useRoute<RouteProp<MainTabParamList, 'VideoCreation'>>();
+  
   const [script, setScript] = useState('');
   const [selectedAvatar, setSelectedAvatar] = useState<Avatar | null>(null);
   const [selectedVoice, setSelectedVoice] = useState<Voice | null>(null);
@@ -594,16 +584,17 @@ const VideoCreationScreen: React.FC<Props> = ({ navigation, route }) => {
         )}
 
         {/* Generate Button - Large Blue Button */}
-        <AnimatedButton
-          title={isGenerating ? "Oluşturuluyor..." : "Konuş"}
+        <TouchableOpacity
+          style={[styles.generateButton, !isGenerateEnabled && styles.generateButtonDisabled]}
           onPress={handleGenerateVideo}
           disabled={!isGenerateEnabled}
-          loading={isGenerating}
-          variant="primary"
-          size="large"
-          fullWidth={true}
-          style={{ marginTop: 24 }}
-        />
+        >
+          {isGenerating ? (
+            <ActivityIndicator size="small" color="#FFFFFF" />
+          ) : (
+            <Text style={styles.generateButtonText}>Konuş</Text>
+          )}
+        </TouchableOpacity>
       </ScrollView>
 
       {/* Language Selector Modal */}
@@ -1007,5 +998,6 @@ const styles = StyleSheet.create({
   },
 });
 
-export default VideoCreationScreen;
+// Named export for VideoTabContainer
+export default CreateVideoScreen;
 

@@ -100,6 +100,31 @@ Create talking avatar videos! Clone your voice, create avatars from your photos,
 - Real-time speech recognition
 - Edit and correction capability
 
+### 🎯 Advanced Pronunciation Evaluation (NEW!)
+
+<div align="center">
+  <img src="screenshots/learning_pronunciation.jpg" alt="Pronunciation Evaluation" width="300"/>
+</div>
+
+- **Multi-Algorithm Assessment System** - No external API required!
+  - **Levenshtein Distance**: Edit distance calculation for word similarity
+  - **Phonetic Matching**: Soundex-like algorithm for pronunciation patterns
+  - **Character Overlap Analysis**: Common character detection
+  
+- **Comprehensive Scoring System**:
+  - ✅ **Accuracy Score** (40%): Overall word matching precision
+  - ✅ **Pronunciation Score** (30%): Phonetic correctness
+  - ✅ **Fluency Score** (20%): Speaking continuity and word order
+  - ✅ **Completeness Score** (10%): Coverage of expected words
+  
+- **Detailed Feedback**:
+  - Word-by-word analysis
+  - Specific pronunciation tips
+  - Performance level: Excellent / Good / Fair / Poor
+  - Similarity percentage for each word
+  
+- **Offline Operation**: 100% local processing, no API costs
+
 ### 📹 Video Management
 
 - Full control video player

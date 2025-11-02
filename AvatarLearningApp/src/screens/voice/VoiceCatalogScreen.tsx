@@ -30,6 +30,7 @@ import { StackNavigationProp } from '@react-navigation/stack';
 import { MainTabParamList, RootStackParamList, Voice, AvatarGender, VoiceProvider, BrandVoice, PlatformType } from '../../types';
 import { PlatformService } from '../../services/platform';
 import { HeyGenService } from '../../services/heygen';
+import Colors, { Shadows, BorderRadius, Spacing } from '../../constants/colors';
 import { CacheUtils } from '../../utils/cacheUtils';
 import { Logger } from '../../utils/Logger';
 import { ErrorHandler } from '../../utils/ErrorHandler';
@@ -719,26 +720,28 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   listContent: {
-    padding: 16,
+    padding: Spacing.md,
   },
   voiceCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
+    backgroundColor: Colors.white,
+    borderRadius: BorderRadius.lg,
+    padding: Spacing.md,
+    marginBottom: Spacing.sm,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     borderWidth: 2,
-    borderColor: '#E5E7EB',
+    borderColor: Colors.border,
+    ...Shadows.medium,
   },
   voiceCardSelected: {
-    borderColor: '#6366F1',
+    borderColor: Colors.primary,
     borderWidth: 3,
+    ...Shadows.large,
   },
   voiceCardCloned: {
-    backgroundColor: '#F0FDF4',
-    borderColor: '#10B981',
+    backgroundColor: Colors.successLight,
+    borderColor: Colors.success,
   },
   voiceInfo: {
     flex: 1,

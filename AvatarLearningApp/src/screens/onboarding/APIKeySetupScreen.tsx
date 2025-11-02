@@ -318,7 +318,7 @@ const APIKeySetupScreen: React.FC<Props> = ({ navigation, route }) => {
         </View>
       </ScrollView>
 
-      {/* Footer with Save Button */}
+      {/* Footer with Save Button and Skip Option */}
       <View style={styles.footer}>
         <TouchableOpacity
           style={[
@@ -333,6 +333,34 @@ const APIKeySetupScreen: React.FC<Props> = ({ navigation, route }) => {
           ) : (
             <Text style={styles.saveButtonText}>Save & Continue</Text>
           )}
+        </TouchableOpacity>
+        
+        <TouchableOpacity
+          style={styles.skipButton}
+          onPress={() => {
+            Logger.info('User skipped API key setup');
+            Alert.alert(
+              'Skip API Key Setup?',
+              'You can add your API key later in Settings. Without an API key, you won\'t be able to create videos or use AI features.',
+              [
+                { text: 'Go Back', style: 'cancel' },
+                {
+                  text: 'Skip for Now',
+                  style: 'destructive',
+                  onPress: () => {
+                    // Navigate to MainTabs without saving API key
+                    navigation.reset({
+                      index: 0,
+                      routes: [{ name: 'MainTabs' }],
+                    });
+                  },
+                },
+              ]
+            );
+          }}
+          disabled={isSaving}
+        >
+          <Text style={styles.skipButtonText}>Skip for Now</Text>
         </TouchableOpacity>
       </View>
     </KeyboardAvoidingView>
@@ -497,11 +525,23 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     borderRadius: 8,
     alignItems: 'center',
+    marginBottom: 12,
   },
   saveButtonText: {
     color: '#FFFFFF',
     fontSize: 18,
     fontWeight: 'bold',
+  },
+  skipButton: {
+    backgroundColor: 'transparent',
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  skipButtonText: {
+    color: '#6B7280',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });
 

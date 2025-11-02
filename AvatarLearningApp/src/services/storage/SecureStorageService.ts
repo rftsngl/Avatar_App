@@ -22,6 +22,8 @@ const SERVICE_IDENTIFIERS = {
   did: 'com.avatarlearningapp.did',
   heygen: 'com.avatarlearningapp.heygen',
   elevenlabs: 'com.avatarlearningapp.elevenlabs',
+  gemini: 'com.avatarlearningapp.gemini',
+  iflytek: 'com.avatarlearningapp.iflytek', // LEGACY - Kept for backward compatibility (old data cleanup)
 } as const;
 
 /**
@@ -258,6 +260,72 @@ export class SecureStorageService {
       throw ErrorHandler.createError(
         ErrorCode.STORAGE_ERROR,
         'Failed to delete ElevenLabs API key'
+      );
+    }
+  }
+
+  /**
+   * Save Gemini API key securely
+   */
+  static async saveGeminiAPIKey(apiKey: string): Promise<void> {
+    try {
+      Logger.info('SecureStorageService: Saving Gemini API key');
+      await Keychain.setGenericPassword(
+        SERVICE_IDENTIFIERS.gemini,
+        apiKey,
+        {
+          service: SERVICE_IDENTIFIERS.gemini,
+          accessible: Keychain.ACCESSIBLE.WHEN_UNLOCKED,
+        }
+      );
+      Logger.info('SecureStorageService: Gemini API key saved successfully');
+    } catch (error) {
+      Logger.error('SecureStorageService: Failed to save Gemini API key', error);
+      throw ErrorHandler.createError(
+        ErrorCode.STORAGE_ERROR,
+        'Failed to save Gemini API key securely'
+      );
+    }
+  }
+
+  /**
+   * Get Gemini API key
+   */
+  static async getGeminiAPIKey(): Promise<string | null> {
+    try {
+      Logger.info('SecureStorageService: Retrieving Gemini API key');
+      const credentials = await Keychain.getGenericPassword({
+        service: SERVICE_IDENTIFIERS.gemini,
+      });
+
+      if (credentials && typeof credentials !== 'boolean') {
+        Logger.info('SecureStorageService: Gemini API key retrieved successfully');
+        return credentials.password;
+      }
+
+      Logger.info('SecureStorageService: No Gemini API key found');
+      return null;
+    } catch (error) {
+      Logger.error('SecureStorageService: Failed to retrieve Gemini API key', error);
+      return null;
+    }
+  }
+
+  /**
+   * Delete Gemini API key
+   */
+  static async deleteGeminiAPIKey(): Promise<void> {
+    try {
+      Logger.info('SecureStorageService: Deleting Gemini API key');
+      await Keychain.resetGenericPassword({
+        service: SERVICE_IDENTIFIERS.gemini,
+      });
+      Logger.info('SecureStorageService: Gemini API key deleted successfully');
+    } catch (error) {
+      Logger.error('SecureStorageService: Failed to delete Gemini API key', error);
+      throw ErrorHandler.createError(
+        ErrorCode.STORAGE_ERROR,
+        'Failed to delete Gemini API key'
       );
     }
   }

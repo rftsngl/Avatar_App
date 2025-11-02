@@ -12,4 +12,7 @@ export { CacheUtils } from './cacheUtils';
 export { HapticUtils, HapticFeedbackType } from './hapticUtils';
 export { PermissionUtils } from './permissionUtils';
 export type { PermissionStatus, PermissionResult } from './permissionUtils';
-
+export * from './testDataGenerator';
+export * from './animationUtils';
+export { PronunciationEvaluator } from './pronunciationEvaluator';
+export type { PronunciationEvaluation, WordAnalysis } from './pronunciationEvaluator';

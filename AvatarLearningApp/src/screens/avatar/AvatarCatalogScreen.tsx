@@ -31,6 +31,7 @@ import { StackNavigationProp } from '@react-navigation/stack';
 import { MainTabParamList, RootStackParamList, Avatar, AvatarGender, PlatformType } from '../../types';
 import { PlatformService } from '../../services/platform';
 import { HeyGenService } from '../../services/heygen';
+import Colors, { Shadows, BorderRadius, Spacing } from '../../constants/colors';
 import { CacheUtils } from '../../utils/cacheUtils';
 import { Logger } from '../../utils/Logger';
 import { ErrorHandler } from '../../utils/ErrorHandler';
@@ -445,20 +446,22 @@ const styles = StyleSheet.create({
   },
   avatarCard: {
     width: ITEM_WIDTH,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
+    backgroundColor: Colors.white,
+    borderRadius: BorderRadius.lg,
     marginBottom: ITEM_SPACING,
     overflow: 'hidden',
     borderWidth: 2,
-    borderColor: '#E5E7EB',
+    borderColor: Colors.border,
+    ...Shadows.medium,
   },
   avatarCardSelected: {
-    borderColor: '#6366F1',
+    borderColor: Colors.primary,
     borderWidth: 3,
+    ...Shadows.large,
   },
   avatarCardCustom: {
-    backgroundColor: '#F0FDF4',
-    borderColor: '#10B981',
+    backgroundColor: Colors.successLight,
+    borderColor: Colors.success,
   },
   avatarImage: {
     width: '100%',

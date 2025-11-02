@@ -33,6 +33,7 @@ import { StackNavigationProp } from '@react-navigation/stack';
 import { MainTabParamList, RootStackParamList, VideoMetadata, PlatformType } from '../../types';
 import { VideoStorageService } from '../../services/video';
 import { HeyGenService } from '../../services/heygen/HeyGenService';
+import Colors, { Shadows, BorderRadius, Spacing } from '../../constants/colors';
 import { Logger } from '../../utils/Logger';
 import { ErrorHandler } from '../../utils/ErrorHandler';
 import { HapticUtils } from '../../utils/hapticUtils';
@@ -809,12 +810,13 @@ const styles = StyleSheet.create({
     padding: CARD_MARGIN,
   },
   videoCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    marginBottom: CARD_MARGIN,
+    backgroundColor: Colors.white,
+    borderRadius: BorderRadius.lg,
+    marginBottom: Spacing.md,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: Colors.border,
+    ...Shadows.medium,
   },
   videoCardTouchable: {
     width: '100%',

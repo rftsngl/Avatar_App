@@ -503,6 +503,7 @@ export type RootStackParamList = {
   Welcome: undefined;
   PlatformSelection: undefined;
   APIKeySetup: { platform: PlatformType };
+  ConfigureAPIKeys: undefined; // API key management screen
   MainTabs: {
     screen?: keyof MainTabParamList;
     params?: {
@@ -518,6 +519,8 @@ export type RootStackParamList = {
   PhotoAvatarCreation: undefined; // HeyGen Avatar IV - Instant video from photo
   VoiceCloning: undefined; // DEACTIVATED - D-ID voice cloning (kept for type safety)
   VoiceProfileManagement: undefined; // DEACTIVATED - D-ID voice management (kept for type safety)
+  Learning: undefined; // AI-powered language learning system (Gemini + ElevenLabs STT)
+  LearningSettings: undefined; // Learning API configuration screen
 };
 
 // ============================================================================
@@ -1122,3 +1125,146 @@ export interface HeyGenDeleteVideoResponse {
   message: string;
 }
 
+// ============================================================================
+// Learning System Types (NEW - 2025-11-01)
+// ============================================================================
+
+/**
+ * Learning mode types (2-tab learning system: Learn & Practice)
+ */
+export type LearningMode = 'learn' | 'practice';
+
+/**
+ * Language proficiency levels (CEFR standard)
+ */
+export type LanguageLevel = 'A1' | 'A2' | 'B1' | 'B2' | 'C1' | 'C2';
+
+/**
+ * Learning topics for sentence generation
+ */
+export type LearningTopic = 
+  | 'greetings'
+  | 'daily_conversation'
+  | 'business'
+  | 'travel'
+  | 'food'
+  | 'shopping'
+  | 'weather'
+  | 'hobbies';
+
+/**
+ * AI-generated sentence for learning
+ */
+export interface AISentence {
+  id: string;
+  text: string;
+  translation: string;
+  difficulty: 'easy' | 'medium' | 'hard';
+  topic: LearningTopic;
+  level: LanguageLevel;
+  tips?: string;
+  createdAt: string;
+}
+
+/**
+ * AI sentence set (batch of sentences from Gemini)
+ */
+export interface AISentenceSet {
+  id: string;
+  topic: LearningTopic;
+  level: LanguageLevel;
+  sentences: AISentence[];
+  createdAt: string;
+}
+
+/**
+ * Practice session result
+ */
+export interface PracticeResult {
+  id: string;
+  mode: LearningMode;
+  timestamp: string;
+  
+  // Input
+  referenceText: string;
+  userAudio: string;           // File path
+  
+  // STT Result (ElevenLabs)
+  transcribedText: string;
+  
+  // Simple accuracy score (word matching, 0-100)
+  // Note: Azure Speech Services pronunciation assessment requires SDK (not available via REST API)
+  accuracy: number;
+  
+  // HeyGen Result (Video generation)
+  videoId?: string;
+  videoUrl?: string;
+  videoStatus?: VideoStatus;
+  
+  // Metadata
+  avatarId: string;
+  voiceId: string;
+  language: SpeechLanguage;
+}
+
+/**
+ * Learning progress (for Learn mode)
+ */
+export interface LearningProgress {
+  userId: string;
+  currentTopic: LearningTopic;
+  currentLevel: LanguageLevel;
+  
+  // Current session
+  currentSetId: string;
+  currentSentenceIndex: number;
+  
+  // History
+  completedSets: string[];      // Set IDs
+  sentenceResults: PracticeResult[];
+  
+  // Statistics
+  totalSentences: number;
+  averageScore: number;
+  weakWords: string[];
+  
+  updatedAt: string;
+}
+
+/**
+ * Practice history (for Learn & Practice modes)
+ */
+export interface PracticeHistory {
+  userId: string;
+  mode: LearningMode;
+  practices: PracticeResult[];
+  
+  // Statistics
+  totalPractices: number;
+  totalDuration: number;        // seconds
+  averageScore: number;
+  
+  updatedAt: string;
+}
+
+/**
+ * User settings for learning features
+ */
+export interface LearningSettings {
+  // Video generation settings
+  autoGenerateVideo: boolean;
+  
+  // Learning preferences
+  defaultLevel: LanguageLevel;
+  defaultTopic: LearningTopic;
+  defaultLanguage: SpeechLanguage;
+}
+
+/**
+ * Navigation types for Learning tab system (DEPRECATED - using internal tabs now)
+ * Kept for backward compatibility
+ */
+export type LearningTabParamList = {
+  Learn: undefined;
+  Practice: undefined;
+};
